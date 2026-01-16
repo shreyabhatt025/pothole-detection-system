@@ -1,210 +1,327 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, MapPin, Building2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+import { authService } from '@/services/authService';
 
-const AuthorityAuth = () => {
+// Check which toast system you're using
+import { toast } from 'sonner';
+// Or if using shadcn toast:
+// import { useToast } from '@/hooks/use-toast';
+
+export default function AuthorityAuth() {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const [signupData, setSignupData] = useState({
-    authorityId: "",
-    name: "",
-    designation: "",
-    department: "",
-    email: "",
-    password: "",
-  });
-  const [loginData, setLoginData] = useState({
-    email: "",
-    password: "",
-    captcha: "",
-  });
+  // If using toast from shadcn, uncomment:
+  // const { toast } = useToast();
+  
+  const [step, setStep] = useState<'email' | 'authid' | 'otp'>('email');
+  const [email, setEmail] = useState('');
+  const [authID, setAuthID] = useState('');
+  const [otp, setOtp] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+  const [canResend, setCanResend] = useState(true);
+  const [authorityName, setAuthorityName] = useState('');
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Registration Submitted",
-      description: "Your registration is pending verification. You will receive an email confirmation.",
-    });
-    setTimeout(() => navigate("/authority/dashboard"), 1500);
+    
+    if (!email.trim()) {
+      toast.error('Please enter your official email');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await authService.checkAuthorityEmail(email);
+      
+      if (result.exists) {
+        setAuthorityName(result.authorityName || '');
+        setStep('authid');
+        toast.success('Authority email verified');
+      } else {
+        toast.error('This email is not registered as an authority. Please contact admin.');
+      }
+    } catch (error) {
+      toast.error('Failed to verify email. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleAuthIDSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Login Successful",
-      description: "Welcome back! Redirecting to dashboard...",
-    });
-    setTimeout(() => navigate("/authority/dashboard"), 1000);
+    
+    if (!authID.trim()) {
+      toast.error('Please enter your Auth ID');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await authService.validateAuthID(authID);
+      
+      if (result.valid) {
+        const otpResult = await authService.sendOTP({
+          identifier: email,
+          type: 'authority'
+        });
+
+        if (otpResult.success) {
+          toast.success(otpResult.message);
+          setStep('otp');
+          startResendTimer();
+        } else {
+          toast.error(otpResult.message);
+        }
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      toast.error('Verification failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOTPSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (otp.length !== 6) {
+      toast.error('Please enter the complete 6-digit OTP');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await authService.verifyOTP({
+        identifier: email,
+        otp,
+        type: 'authority'
+      });
+
+      if (result.success && result.token) {
+        toast.success('Login successful!');
+        localStorage.setItem('authority_token', result.token);
+        localStorage.setItem('authority_email', email);
+        localStorage.setItem('authority_authid', authID);
+        localStorage.setItem('authority_name', authorityName);
+        navigate('/authority-dashboard');
+      } else {
+        toast.error(result.message || 'Invalid OTP');
+      }
+    } catch (error) {
+      toast.error('Verification failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startResendTimer = () => {
+    setCanResend(false);
+    setResendTimer(30);
+    
+    const interval = setInterval(() => {
+      setResendTimer(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setCanResend(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleResendOTP = async () => {
+    if (!canResend) return;
+
+    setLoading(true);
+    try {
+      const result = await authService.sendOTP({
+        identifier: email,
+        type: 'authority'
+      });
+
+      if (result.success) {
+        toast.success('New OTP sent to your email!');
+        startResendTimer();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      toast.error('Failed to resend OTP');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen gradient-hero">
-      {/* Header */}
-      <header className="border-b border-border bg-card/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center">
-              <MapPin className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold text-foreground">PDS</span>
-          </Link>
-        </div>
-      </header>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">
+            {step === 'email' && 'Authority Login'}
+            {step === 'authid' && 'Verify Auth ID'}
+            {step === 'otp' && 'Verify OTP'}
+          </CardTitle>
+          <CardDescription>
+            {step === 'email' && 'Enter your official authority email'}
+            {step === 'authid' && `Enter Auth ID for ${authorityName}`}
+            {step === 'otp' && `Enter OTP sent to ${email}`}
+          </CardDescription>
+        </CardHeader>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-12">
-        <div className="max-w-md mx-auto">
-          {/* Back Button */}
-          <Link to="/select-account" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8 transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Account Selection</span>
-          </Link>
-
-          <Card className="animate-fade-in">
-            <CardHeader className="text-center pb-2">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                <Building2 className="w-6 h-6 text-primary" />
+        <CardContent>
+          {step === 'email' && (
+            <form onSubmit={handleEmailSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Official Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter official email"
+                  required
+                />
+                <p className="text-sm text-gray-500">
+                  Must be a registered authority email
+                </p>
               </div>
-              <CardTitle className="text-2xl">Authority Portal</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="login" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-6">
-                  <TabsTrigger value="login">Login</TabsTrigger>
-                  <TabsTrigger value="signup">Sign Up</TabsTrigger>
-                </TabsList>
 
-                {/* Login Tab */}
-                <TabsContent value="login">
-                  <form onSubmit={handleLogin} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="login-email">Official Email ID</Label>
-                      <Input
-                        id="login-email"
-                        type="email"
-                        placeholder="Enter your official email"
-                        value={loginData.email}
-                        onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="login-password">Password</Label>
-                      <Input
-                        id="login-password"
-                        type="password"
-                        placeholder="Enter your password"
-                        value={loginData.password}
-                        onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="captcha">CAPTCHA Verification</Label>
-                      <div className="flex gap-2">
-                        <div className="flex-1 bg-muted rounded-md p-3 text-center font-mono text-lg tracking-widest select-none">
-                          X7K9M2
-                        </div>
-                        <Input
-                          id="captcha"
-                          type="text"
-                          placeholder="Enter code"
-                          className="w-28"
-                          value={loginData.captcha}
-                          onChange={(e) => setLoginData({ ...loginData, captcha: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                    <Button type="submit" className="w-full">Login</Button>
-                  </form>
-                </TabsContent>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full"
+              >
+                {loading ? 'Verifying...' : 'Verify Email'}
+              </Button>
+            </form>
+          )}
 
-                {/* Sign Up Tab */}
-                <TabsContent value="signup">
-                  <form onSubmit={handleSignup} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="authority-id">Authority ID</Label>
-                      <Input
-                        id="authority-id"
-                        type="text"
-                        placeholder="Enter your Authority ID"
-                        value={signupData.authorityId}
-                        onChange={(e) => setSignupData({ ...signupData, authorityId: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="authority-name">Full Name</Label>
-                      <Input
-                        id="authority-name"
-                        type="text"
-                        placeholder="Enter your full name"
-                        value={signupData.name}
-                        onChange={(e) => setSignupData({ ...signupData, name: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="designation">Designation</Label>
-                      <Input
-                        id="designation"
-                        type="text"
-                        placeholder="e.g., Junior Engineer"
-                        value={signupData.designation}
-                        onChange={(e) => setSignupData({ ...signupData, designation: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="department">Department</Label>
-                      <Select onValueChange={(value) => setSignupData({ ...signupData, department: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select department" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pwd">Public Works Department</SelectItem>
-                          <SelectItem value="municipal">Municipal Corporation</SelectItem>
-                          <SelectItem value="highway">Highway Authority</SelectItem>
-                          <SelectItem value="transport">Transport Department</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="authority-email">Official Email ID</Label>
-                      <Input
-                        id="authority-email"
-                        type="email"
-                        placeholder="Enter your official email"
-                        value={signupData.email}
-                        onChange={(e) => setSignupData({ ...signupData, email: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="authority-password">Create Password</Label>
-                      <Input
-                        id="authority-password"
-                        type="password"
-                        placeholder="Create a strong password"
-                        value={signupData.password}
-                        onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
-                      />
-                    </div>
-                    <Button type="submit" className="w-full">Submit Registration</Button>
-                  </form>
-                </TabsContent>
-              </Tabs>
+          {step === 'authid' && (
+            <form onSubmit={handleAuthIDSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="authid">Auth ID</Label>
+                <Input
+                  id="authid"
+                  type="text"
+                  value={authID}
+                  onChange={(e) => setAuthID(e.target.value.toUpperCase())}
+                  placeholder="Enter your Auth ID"
+                  className="uppercase"
+                  required
+                />
+                <p className="text-sm text-gray-500">
+                  Provided by your department administrator
+                </p>
+              </div>
 
-              <p className="text-xs text-muted-foreground text-center mt-6">
-                Authority accounts require verification. Ensure you use your official credentials.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
+              <div className="space-y-2">
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full"
+                >
+                  {loading ? 'Verifying...' : 'Verify & Send OTP'}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setStep('email');
+                    setAuthID('');
+                  }}
+                  disabled={loading}
+                  className="w-full"
+                >
+                  ← Change email
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {step === 'otp' && (
+            <form onSubmit={handleOTPSubmit} className="space-y-6">
+              <div className="space-y-4">
+                <Label className="text-center block">Enter 6-digit verification code</Label>
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    value={otp}
+                    onChange={setOtp}
+                    disabled={loading}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+                
+                <div className="text-center">
+                  <Button
+                    type="button"
+                    variant="link"
+                    onClick={handleResendOTP}
+                    disabled={!canResend || loading}
+                    className="text-sm"
+                  >
+                    {canResend ? 'Resend OTP' : `Resend in ${resendTimer}s`}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Button
+                  type="submit"
+                  disabled={loading || otp.length !== 6}
+                  className="w-full"
+                >
+                  {loading ? 'Verifying...' : 'Verify OTP'}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setStep('authid');
+                    setOtp('');
+                  }}
+                  disabled={loading}
+                  className="w-full"
+                >
+                  ← Back to Auth ID
+                </Button>
+              </div>
+            </form>
+          )}
+        </CardContent>
+
+        <CardFooter className="flex justify-center border-t pt-6">
+          <p className="text-sm text-gray-600">
+            Not an authority?{' '}
+            <Link to="/select-account" className="font-medium text-blue-600 hover:text-blue-800">
+              Switch to Citizen Login
+            </Link>
+          </p>
+        </CardFooter>
+      </Card>
     </div>
   );
-};
-
-export default AuthorityAuth;
+}
