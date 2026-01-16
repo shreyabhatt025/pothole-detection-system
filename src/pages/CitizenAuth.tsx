@@ -1,178 +1,253 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, MapPin, Phone } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+import { authService } from '@/services/authService';
 
-const CitizenAuth = () => {
+// Check which toast system you're using
+// Option 1: If using sonner
+import { toast } from 'sonner';
+// Option 2: If using toast from shadcn
+// import { useToast } from '@/hooks/use-toast';
+
+export default function CitizenAuth() {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const [isOtpSent, setIsOtpSent] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    phone: "",
-    otp: "",
-  });
+  // If using toast from shadcn, uncomment:
+  // const { toast } = useToast();
+  
+  const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+  const [canResend, setCanResend] = useState(true);
 
-  const handleSendOtp = () => {
-    if (formData.phone.length !== 10) {
-      toast({
-        title: "Invalid Phone Number",
-        description: "Please enter a valid 10-digit phone number.",
-        variant: "destructive",
-      });
+  const handlePhoneSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!phone.trim()) {
+      toast.error('Please enter your phone number');
       return;
     }
-    setIsOtpSent(true);
-    toast({
-      title: "OTP Sent",
-      description: "A verification code has been sent to your phone.",
-    });
+
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!phoneRegex.test(phone)) {
+      toast.error('Please enter a valid 10-digit phone number');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await authService.sendOTP({
+        identifier: phone,
+        type: 'citizen'
+      });
+
+      if (result.success) {
+        toast.success(result.message);
+        setStep('otp');
+        startResendTimer();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      toast.error('Failed to send OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleOTPSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulating auth for now
-    toast({
-      title: "Success",
-      description: "Login successful! Redirecting to dashboard...",
-    });
-    setTimeout(() => navigate("/citizen/dashboard"), 1000);
+    
+    if (otp.length !== 6) {
+      toast.error('Please enter the complete 6-digit OTP');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await authService.verifyOTP({
+        identifier: phone,
+        otp,
+        type: 'citizen'
+      });
+
+      if (result.success && result.token) {
+        toast.success('Login successful!');
+        localStorage.setItem('citizen_token', result.token);
+        localStorage.setItem('citizen_phone', phone);
+        navigate('/citizen-dashboard');
+      } else {
+        toast.error(result.message || 'Invalid OTP');
+      }
+    } catch (error) {
+      toast.error('Verification failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startResendTimer = () => {
+    setCanResend(false);
+    setResendTimer(30);
+    
+    const interval = setInterval(() => {
+      setResendTimer(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setCanResend(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleResendOTP = async () => {
+    if (!canResend) return;
+
+    setLoading(true);
+    try {
+      const result = await authService.sendOTP({
+        identifier: phone,
+        type: 'citizen'
+      });
+
+      if (result.success) {
+        toast.success('New OTP sent!');
+        startResendTimer();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      toast.error('Failed to resend OTP');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen gradient-hero">
-      {/* Header */}
-      <header className="border-b border-border bg-card/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center">
-              <MapPin className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold text-foreground">PDS</span>
-          </Link>
-        </div>
-      </header>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">
+            {step === 'phone' ? 'Citizen Login' : 'Verify OTP'}
+          </CardTitle>
+          <CardDescription>
+            {step === 'phone' 
+              ? 'Enter your phone number to receive OTP' 
+              : `Enter OTP sent to ${phone}`
+            }
+          </CardDescription>
+        </CardHeader>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-12">
-        <div className="max-w-md mx-auto">
-          {/* Back Button */}
-          <Link to="/select-account" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8 transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Account Selection</span>
-          </Link>
-
-          <Card className="animate-fade-in">
-            <CardHeader className="text-center pb-2">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                <Phone className="w-6 h-6 text-primary" />
+        <CardContent>
+          {step === 'phone' ? (
+            <form onSubmit={handlePhoneSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+                    +91
+                  </span>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    placeholder="Enter 10-digit number"
+                    className="rounded-l-none"
+                    required
+                    maxLength={10}
+                  />
+                </div>
+                <p className="text-sm text-gray-500">
+                  We'll send a verification code to this number
+                </p>
               </div>
-              <CardTitle className="text-2xl">Citizen Portal</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="login" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-6">
-                  <TabsTrigger value="login">Login</TabsTrigger>
-                  <TabsTrigger value="signup">Sign Up</TabsTrigger>
-                </TabsList>
 
-                {/* Login Tab */}
-                <TabsContent value="login">
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="login-phone">Phone Number</Label>
-                      <Input
-                        id="login-phone"
-                        type="tel"
-                        placeholder="Enter 10-digit phone number"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        maxLength={10}
-                      />
-                    </div>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full"
+              >
+                {loading ? 'Sending OTP...' : 'Send OTP'}
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={handleOTPSubmit} className="space-y-6">
+              <div className="space-y-4">
+                <Label className="text-center block">Enter 6-digit verification code</Label>
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    value={otp}
+                    onChange={setOtp}
+                    disabled={loading}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+                
+                <div className="text-center">
+                  <Button
+                    type="button"
+                    variant="link"
+                    onClick={handleResendOTP}
+                    disabled={!canResend || loading}
+                    className="text-sm"
+                  >
+                    {canResend ? 'Resend OTP' : `Resend in ${resendTimer}s`}
+                  </Button>
+                </div>
+              </div>
 
-                    {isOtpSent ? (
-                      <div className="space-y-2">
-                        <Label htmlFor="login-otp">Enter OTP</Label>
-                        <Input
-                          id="login-otp"
-                          type="text"
-                          placeholder="Enter 6-digit OTP"
-                          value={formData.otp}
-                          onChange={(e) => setFormData({ ...formData, otp: e.target.value })}
-                          maxLength={6}
-                        />
-                        <Button type="submit" className="w-full">Verify & Login</Button>
-                      </div>
-                    ) : (
-                      <Button type="button" onClick={handleSendOtp} className="w-full">
-                        Send OTP
-                      </Button>
-                    )}
-                  </form>
-                </TabsContent>
+              <div className="space-y-2">
+                <Button
+                  type="submit"
+                  disabled={loading || otp.length !== 6}
+                  className="w-full"
+                >
+                  {loading ? 'Verifying...' : 'Verify OTP'}
+                </Button>
 
-                {/* Sign Up Tab */}
-                <TabsContent value="signup">
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-name">Full Name</Label>
-                      <Input
-                        id="signup-name"
-                        type="text"
-                        placeholder="Enter your full name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-phone">Phone Number</Label>
-                      <Input
-                        id="signup-phone"
-                        type="tel"
-                        placeholder="Enter 10-digit phone number"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        maxLength={10}
-                      />
-                    </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setStep('phone');
+                    setOtp('');
+                  }}
+                  disabled={loading}
+                  className="w-full"
+                >
+                  ← Change phone number
+                </Button>
+              </div>
+            </form>
+          )}
+        </CardContent>
 
-                    {isOtpSent ? (
-                      <div className="space-y-2">
-                        <Label htmlFor="signup-otp">Enter OTP</Label>
-                        <Input
-                          id="signup-otp"
-                          type="text"
-                          placeholder="Enter 6-digit OTP"
-                          value={formData.otp}
-                          onChange={(e) => setFormData({ ...formData, otp: e.target.value })}
-                          maxLength={6}
-                        />
-                        <Button type="submit" className="w-full">Verify & Sign Up</Button>
-                      </div>
-                    ) : (
-                      <Button type="button" onClick={handleSendOtp} className="w-full">
-                        Send OTP
-                      </Button>
-                    )}
-                  </form>
-                </TabsContent>
-              </Tabs>
-
-              <p className="text-xs text-muted-foreground text-center mt-6">
-                By continuing, you agree to our Terms of Service and Privacy Policy.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
+        <CardFooter className="flex justify-center border-t pt-6">
+          <p className="text-sm text-gray-600">
+            Not a citizen?{' '}
+            <Link to="/select-account" className="font-medium text-blue-600 hover:text-blue-800">
+              Switch to Authority Login
+            </Link>
+          </p>
+        </CardFooter>
+      </Card>
     </div>
   );
-};
-
-export default CitizenAuth;
+}
