@@ -8,9 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, MapPin, Phone, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-/* ======================================================
-   CAPTCHA GENERATOR
-   ====================================================== */
+//CAPTCHA GENERATOR 
 const generateCaptcha = (): string => {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let captcha = "";
@@ -20,16 +18,15 @@ const generateCaptcha = (): string => {
   return captcha;
 };
 
-/* ======================================================
-   4-DIGIT OTP GENERATOR
-   ====================================================== */
+   //4-DIGIT OTP GENERATOR
+  
 const generateOtp = (): string => {
   return Math.floor(1000 + Math.random() * 9000).toString();
 };
 
-/* ======================================================
-   INDIAN PHONE VALIDATION (+91 + 10 digits)
-   ====================================================== */
+
+   //INDIAN PHONE VALIDATION (+91 + 10 digits)
+   
 const isValidIndianPhone = (phone: string): boolean => {
   if (phone.length !== 10) return false;
 
@@ -52,20 +49,20 @@ const CitizenAuth = () => {
     captcha: "",
   });
 
-  /* =====================
-     CAPTCHA STATE
-     ===================== */
+  
+     //CAPTCHA STATE
+     
   const [captcha, setCaptcha] = useState(generateCaptcha());
   const [captchaTimer, setCaptchaTimer] = useState(60);
 
-  /* =====================
-     OTP STATE
-     ===================== */
+  
+     //OTP STATE
+     
   const [generatedOtp, setGeneratedOtp] = useState("");
 
-  /* ======================================================
-     CAPTCHA AUTO REFRESH (60s)
-     ====================================================== */
+ 
+     //CAPTCHA AUTO REFRESH (60s)
+     
   useEffect(() => {
     const refreshInterval = setInterval(() => {
       setCaptcha(generateCaptcha());
@@ -82,9 +79,9 @@ const CitizenAuth = () => {
     };
   }, []);
 
-  /* ======================================================
-     SEND OTP
-     ====================================================== */
+  
+     //SEND OTP
+     
   const handleSendOtp = () => {
     if (!isValidIndianPhone(formData.phone)) {
       toast({
@@ -111,9 +108,8 @@ const CitizenAuth = () => {
     });
   };
 
-  /* ======================================================
-     LOGIN / SIGNUP SUBMIT
-     ====================================================== */
+      //LOGIN / SIGNUP SUBMIT
+     
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 

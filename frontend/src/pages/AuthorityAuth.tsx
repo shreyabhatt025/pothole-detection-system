@@ -9,9 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, MapPin, Building2, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-/* ======================================================
-   APPROVED AUTHORITY EMAIL DOMAINS
-   ====================================================== */
+
+   // APPROVED AUTHORITY EMAIL DOMAINS
 const ALLOWED_AUTHORITY_DOMAINS = [
   "banasthali.in",
   "gov.in",
@@ -22,9 +21,9 @@ const ALLOWED_AUTHORITY_DOMAINS = [
   "municipal.in",
 ];
 
-/* ======================================================
-   EMAIL DOMAIN VALIDATION
-   ====================================================== */
+
+   //EMAIL DOMAIN VALIDATION
+   
 const isValidAuthorityEmail = (email: string): boolean => {
   if (!email.includes("@")) return false;
 
@@ -41,9 +40,8 @@ const isValidAuthorityEmail = (email: string): boolean => {
   return false;
 };
 
-/* ======================================================
-   CAPTCHA GENERATOR
-   ====================================================== */
+  // CAPTCHA GENERATOR
+   
 const generateCaptcha = (): string => {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let captcha = "";
@@ -53,9 +51,9 @@ const generateCaptcha = (): string => {
   return captcha;
 };
 
-/* ======================================================
-   4-DIGIT OTP GENERATOR
-   ====================================================== */
+
+   //4-DIGIT OTP GENERATOR
+   
 const generateOtp = (): string => {
   return Math.floor(1000 + Math.random() * 9000).toString();
 };
@@ -64,9 +62,9 @@ const AuthorityAuth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  /* =====================
-     SIGNUP STATE
-     ===================== */
+  
+     //SIGNUP STATE
+     
   const [signupData, setSignupData] = useState({
     authorityEmail: "",
     name: "",
@@ -75,9 +73,7 @@ const AuthorityAuth = () => {
     password: "",
   });
 
-  /* =====================
-     LOGIN STATE
-     ===================== */
+  //  LOGIN STATE 
   const [loginData, setLoginData] = useState({
     email: "",
     otp: "",
@@ -86,20 +82,19 @@ const AuthorityAuth = () => {
 
   const [isOtpSent, setIsOtpSent] = useState(false);
 
-  /* =====================
-     CAPTCHA STATE
-     ===================== */
+
+    // CAPTCHA STATE
+     
   const [captcha, setCaptcha] = useState(generateCaptcha());
   const [captchaTimer, setCaptchaTimer] = useState(60);
 
-  /* =====================
-     OTP STATE
-     ===================== */
+    // OTP STATE
+    
   const [generatedOtp, setGeneratedOtp] = useState("");
 
-  /* ======================================================
-     CAPTCHA AUTO REFRESH (60s)
-     ====================================================== */
+  
+     // CAPTCHA AUTO REFRESH (60s)
+     
   useEffect(() => {
     const refreshInterval = setInterval(() => {
       setCaptcha(generateCaptcha());
@@ -116,9 +111,8 @@ const AuthorityAuth = () => {
     };
   }, []);
 
-  /* ======================================================
-     SEND OTP
-     ====================================================== */
+  
+     //SEND OTP 
   const handleSendOtp = () => {
     if (!loginData.email) {
       toast({
@@ -154,9 +148,8 @@ const AuthorityAuth = () => {
     });
   };
 
-  /* ======================================================
-     LOGIN SUBMIT
-     ====================================================== */
+  // LOGIN SUBMIT
+    
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -190,9 +183,8 @@ const AuthorityAuth = () => {
     setTimeout(() => navigate("/authority/dashboard"), 1000);
   };
 
-  /* ======================================================
-     SIGNUP SUBMIT
-     ====================================================== */
+     //SIGNUP SUBMIT
+    
   const handleSignup = (e: React.FormEvent) => {
     e.preventDefault();
 
