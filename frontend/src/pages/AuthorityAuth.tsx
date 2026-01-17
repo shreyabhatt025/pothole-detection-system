@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 const AuthorityAuth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Signup data
   const [signupData, setSignupData] = useState({
     authorityId: "",
     name: "",
@@ -20,12 +23,76 @@ const AuthorityAuth = () => {
     email: "",
     password: "",
   });
+
+  // Login data
   const [loginData, setLoginData] = useState({
     email: "",
-    password: "",
+    otp: "",
     captcha: "",
   });
 
+  // OTP sent state
+  const [isOtpSent, setIsOtpSent] = useState(false);
+
+  // Send OTP
+  const handleSendOtp = () => {
+    if (!loginData.email) {
+      toast({
+        title: "Enter Email",
+        description: "Please enter your official email to receive OTP.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsOtpSent(true);
+    toast({
+      title: "OTP Sent",
+      description: `A verification code has been sent to ${loginData.email}.`,
+    });
+  };
+
+  // Login submit
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!isOtpSent) {
+      toast({
+        title: "Send OTP First",
+        description: "Click on 'Send OTP' to proceed.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // CAPTCHA validation
+    if (loginData.captcha !== "X7K9M2") {
+      toast({
+        title: "Invalid CAPTCHA",
+        description: "Please enter the correct CAPTCHA code.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // OTP validation (simulated)
+    if (loginData.otp !== "123456") {
+      toast({
+        title: "Invalid OTP",
+        description: "Please enter the correct OTP sent to your email.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Login Successful",
+      description: "Welcome back! Redirecting to dashboard...",
+    });
+    setTimeout(() => navigate("/authority/dashboard"), 1000);
+  };
+
+  // Signup submit
   const handleSignup = (e: React.FormEvent) => {
     e.preventDefault();
     toast({
@@ -33,15 +100,6 @@ const AuthorityAuth = () => {
       description: "Your registration is pending verification. You will receive an email confirmation.",
     });
     setTimeout(() => navigate("/authority/dashboard"), 1500);
-  };
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast({
-      title: "Login Successful",
-      description: "Welcome back! Redirecting to dashboard...",
-    });
-    setTimeout(() => navigate("/authority/dashboard"), 1000);
   };
 
   return (
@@ -94,37 +152,49 @@ const AuthorityAuth = () => {
                         onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="login-password">Password</Label>
-                      <Input
-                        id="login-password"
-                        type="password"
-                        placeholder="Enter your password"
-                        value={loginData.password}
-                        onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="captcha">CAPTCHA Verification</Label>
-                      <div className="flex gap-2">
-                        <div className="flex-1 bg-muted rounded-md p-3 text-center font-mono text-lg tracking-widest select-none">
-                          X7K9M2
+
+                    {!isOtpSent ? (
+                      <Button type="button" onClick={handleSendOtp} className="w-full">
+                        Send OTP
+                      </Button>
+                    ) : (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="login-otp">Enter OTP</Label>
+                          <Input
+                            id="login-otp"
+                            type="text"
+                            placeholder="Enter OTP"
+                            value={loginData.otp}
+                            onChange={(e) => setLoginData({ ...loginData, otp: e.target.value })}
+                          />
                         </div>
-                        <Input
-                          id="captcha"
-                          type="text"
-                          placeholder="Enter code"
-                          className="w-28"
-                          value={loginData.captcha}
-                          onChange={(e) => setLoginData({ ...loginData, captcha: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                    <Button type="submit" className="w-full">Login</Button>
+
+                        {/* CAPTCHA */}
+                        <div className="space-y-2">
+                          <Label htmlFor="captcha">CAPTCHA Verification</Label>
+                          <div className="flex gap-2">
+                            <div className="flex-1 bg-muted rounded-md p-3 text-center font-mono text-lg tracking-widest select-none">
+                              X7K9M2
+                            </div>
+                            <Input
+                              id="captcha"
+                              type="text"
+                              placeholder="Enter code"
+                              className="w-28"
+                              value={loginData.captcha}
+                              onChange={(e) => setLoginData({ ...loginData, captcha: e.target.value })}
+                            />
+                          </div>
+                        </div>
+
+                        <Button type="submit" className="w-full">Verify & Login</Button>
+                      </>
+                    )}
                   </form>
                 </TabsContent>
 
-                {/* Sign Up Tab */}
+                {/* Sign Up Tab (unchanged) */}
                 <TabsContent value="signup">
                   <form onSubmit={handleSignup} className="space-y-4">
                     <div className="space-y-2">
@@ -171,16 +241,6 @@ const AuthorityAuth = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    {/* <div className="space-y-2">
-                      <Label htmlFor="authority-email">Official Email ID</Label>
-                      <Input
-                        id="authority-email"
-                        type="email"
-                        placeholder="Enter your official email"
-                        value={signupData.email}
-                        onChange={(e) => setSignupData({ ...signupData, email: e.target.value })}
-                      />
-                    </div> */}
                     <div className="space-y-2">
                       <Label htmlFor="authority-password">Create Password</Label>
                       <Input

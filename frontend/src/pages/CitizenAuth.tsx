@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,11 +12,12 @@ import { useToast } from "@/hooks/use-toast";
 const CitizenAuth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [isOtpSent, setIsOtpSent] = useState(true)
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
     otp: "",
+    captcha: "", // Added for CAPTCHA
   });
 
   const handleSendOtp = () => {
@@ -36,6 +38,17 @@ const CitizenAuth = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // CAPTCHA validation
+    if (formData.captcha !== "X7K9M2") {
+      toast({
+        title: "Invalid CAPTCHA",
+        description: "Please enter the correct CAPTCHA code.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Simulating auth for now
     toast({
       title: "Success",
@@ -97,18 +110,39 @@ const CitizenAuth = () => {
                     </div>
 
                     {isOtpSent ? (
-                      <div className="space-y-2">
-                        <Label htmlFor="login-otp">Enter OTP</Label>
-                        <Input
-                          id="login-otp"
-                          type="text"
-                          placeholder="Enter 6-digit OTP"
-                          value={formData.otp}
-                          onChange={(e) => setFormData({ ...formData, otp: e.target.value })}
-                          maxLength={6}
-                        />
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="login-otp">Enter OTP</Label>
+                          <Input
+                            id="login-otp"
+                            type="text"
+                            placeholder="Enter 6-digit OTP"
+                            value={formData.otp}
+                            onChange={(e) => setFormData({ ...formData, otp: e.target.value })}
+                            maxLength={6}
+                          />
+                        </div>
+
+                        {/* CAPTCHA */}
+                        <div className="space-y-2">
+                          <Label htmlFor="captcha">CAPTCHA Verification</Label>
+                          <div className="flex gap-2">
+                            <div className="flex-1 bg-muted rounded-md p-3 text-center font-mono text-lg tracking-widest select-none">
+                              X7K9M2
+                            </div>
+                            <Input
+                              id="captcha"
+                              type="text"
+                              placeholder="Enter code"
+                              className="w-28"
+                              value={formData.captcha}
+                              onChange={(e) => setFormData({ ...formData, captcha: e.target.value })}
+                            />
+                          </div>
+                        </div>
+
                         <Button type="submit" className="w-full">Verify & Login</Button>
-                      </div>
+                      </>
                     ) : (
                       <Button type="button" onClick={handleSendOtp} className="w-full">
                         Send OTP
@@ -143,18 +177,39 @@ const CitizenAuth = () => {
                     </div>
 
                     {isOtpSent ? (
-                      <div className="space-y-2">
-                        <Label htmlFor="signup-otp">Enter OTP</Label>
-                        <Input
-                          id="signup-otp"
-                          type="text"
-                          placeholder="Enter 6-digit OTP"
-                          value={formData.otp}
-                          onChange={(e) => setFormData({ ...formData, otp: e.target.value })}
-                          maxLength={6}
-                        />
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="signup-otp">Enter OTP</Label>
+                          <Input
+                            id="signup-otp"
+                            type="text"
+                            placeholder="Enter 6-digit OTP"
+                            value={formData.otp}
+                            onChange={(e) => setFormData({ ...formData, otp: e.target.value })}
+                            maxLength={6}
+                          />
+                        </div>
+
+                        {/* CAPTCHA */}
+                        <div className="space-y-2">
+                          <Label htmlFor="captcha">CAPTCHA Verification</Label>
+                          <div className="flex gap-2">
+                            <div className="flex-1 bg-muted rounded-md p-3 text-center font-mono text-lg tracking-widest select-none">
+                              X7K9M2
+                            </div>
+                            <Input
+                              id="captcha"
+                              type="text"
+                              placeholder="Enter code"
+                              className="w-28"
+                              value={formData.captcha}
+                              onChange={(e) => setFormData({ ...formData, captcha: e.target.value })}
+                            />
+                          </div>
+                        </div>
+
                         <Button type="submit" className="w-full">Verify & Sign Up</Button>
-                      </div>
+                      </>
                     ) : (
                       <Button type="button" onClick={handleSendOtp} className="w-full">
                         Send OTP
